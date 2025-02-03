@@ -1,8 +1,6 @@
 name: Build
 on:
   workflow_dispatch:
-env:
-  KANIKO_CACHE_ARGS: "--cache=true --cache-copy-layers=true --cache-ttl=24h"
 jobs:
   build-to-dockerhub:
     runs-on: ubuntu-22.04
@@ -30,7 +28,6 @@ jobs:
           /kaniko/executor --dockerfile="./Dockerfile" \
             --context="${{ github.repositoryUrl }}#${{ github.ref }}#${{ github.sha }}"  \
             --destination="$DOCKER_IMAGE_NAME:$IMAGE_TAG" \
-            ${{ env.KANIKO_CACHE_ARGS }} \
             --push-retry 5
 
           # Store image tag in step output for next job
@@ -44,12 +41,10 @@ jobs:
   update-repo-variable:
     runs-on: ubuntu-22.04
     needs: build-to-dockerhub  # Ensure it runs after the first job
-    permissions:
-      actions: write  # Required for updating repository variables
     steps:
       - name: Update Repository Variable with Image Tag
         run: |
-          curl -X PATCH -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          curl -X PATCH -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
                -H "Accept: application/vnd.github.v3+json" \
                https://api.github.com/repos/${{ github.repository }}/actions/variables/LATEST_IMAGE_TAG \
                -d '{"value": "'"${{ needs.build-to-dockerhub.outputs.image_tag }}"'"}'
